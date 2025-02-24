@@ -108,8 +108,16 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 	options := s.scope.GetOptions()
 	cicustom := fmt.Sprintf("user=%s:%s", snippetStorageName, userSnippetPath(vmName))
 	ide2 := fmt.Sprintf("file=%s:cloudinit,media=cdrom", imageStorageName)
-	scsi0 := fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage()))
+	// scsi0 := fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage()))
 	net0 := hardware.NetworkDevice.String()
+	// Add extra disks dynamically
+	scsiDisks := api.Scsi{
+		Scsi0: fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage())),
+	}
+	for i, disk := range s.scope.GetHardware().ExtraDisks {
+		scsiKey := fmt.Sprintf("Scsi%d", i+1) // Example: Scsi1, Scsi2, Scsi3...
+		scsiDisks[scsiKey] = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+	}
 
 	vmoptions := api.VirtualMachineCreateOptions{
 		ACPI:          boolToInt8(options.ACPI),
@@ -140,7 +148,7 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 		OSType:        api.OSType(options.OSType),
 		Protection:    boolToInt8(options.Protection),
 		Reboot:        int(boolToInt8(options.Reboot)),
-		Scsi:          api.Scsi{Scsi0: scsi0},
+		Scsi:          scsiDisks,
 		ScsiHw:        api.VirtioScsiPci,
 		SearchDomain:  network.SearchDomain,
 		Serial:        api.Serial{Serial0: "socket"},
@@ -168,8 +176,15 @@ func boolToInt8(b bool) int8 {
 func (s *Service) injectVMOption(vmOption *api.VirtualMachineCreateOptions, storage string) *api.VirtualMachineCreateOptions {
 	// storage is finalized after node scheduling so we need to inject storage name here
 	ide2 := fmt.Sprintf("file=%s:cloudinit,media=cdrom", storage)
-	scsi0 := fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
-	vmOption.Scsi.Scsi0 = scsi0
+	// scsi0 := fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
+	// vmOption.Scsi.Scsi0 = scsi0
+	vmOption.Scsi.Scsi0 = fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
+
+	// Loop through ExtraDisks and inject correct storage
+	for i, disk := range s.scope.GetHardware().ExtraDisks {
+		scsiKey := fmt.Sprintf("Scsi%d", i+1)
+		vmOption.Scsi[scsiKey] = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+	}
 	vmOption.Ide.Ide2 = ide2
 	vmOption.Storage = storage
 
