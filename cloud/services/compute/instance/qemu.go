@@ -3,6 +3,7 @@ package instance
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/k8s-proxmox/cluster-api-provider-proxmox/cloud/scheduler/framework"
 	"github.com/k8s-proxmox/proxmox-go/api"
@@ -199,9 +200,16 @@ func (s *Service) injectVMOption(vmOption *api.VirtualMachineCreateOptions, stor
 		extraDisks = extraDisks[:5] // Limit to 5 extra disks (total 6 including root)
 	}
 
+	// Use reflection to dynamically set `Scsi1`, `Scsi2`, etc.
+	scsiStruct := reflect.ValueOf(&vmOption.Scsi).Elem()
 	for i, disk := range extraDisks {
-		slot := i + 1 // scsi1, scsi2, scsi3...
-		vmOption.Scsi.Set(fmt.Sprintf("Scsi%d", slot), fmt.Sprintf("%s:%d,size=%s", disk.Storage, slot, disk.Size))
+		fieldName := fmt.Sprintf("Scsi%d", i+1) // Scsi1, Scsi2, ...
+		field := scsiStruct.FieldByName(fieldName)
+		if field.IsValid() && field.CanSet() {
+			field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
+		} else {
+			log.FromContext(context.TODO()).Error(fmt.Errorf("invalid SCSI field"), "Failed to set extra disk", "field", fieldName)
+		}
 	}
 	return vmOption
 }
