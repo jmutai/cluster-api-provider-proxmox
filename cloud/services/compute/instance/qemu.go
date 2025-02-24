@@ -118,7 +118,7 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 	extraDisks := s.scope.GetHardware().ExtraDisks
 	if len(extraDisks) > 0 {
 		if len(extraDisks) > 6 {
-			return fmt.Errorf("too many extra disks, only 6 supported")
+			return api.VirtualMachineCreateOptions{}, fmt.Errorf("too many extra disks, only 6 supported")
 		}
 		for i, disk := range extraDisks {
 			switch i {
@@ -195,17 +195,36 @@ func boolToInt8(b bool) int8 {
 func (s *Service) injectVMOption(vmOption *api.VirtualMachineCreateOptions, storage string) *api.VirtualMachineCreateOptions {
 	// storage is finalized after node scheduling so we need to inject storage name here
 	ide2 := fmt.Sprintf("file=%s:cloudinit,media=cdrom", storage)
+	vmOption.Ide.Ide2 = ide2
+	vmOption.Storage = storage
+
 	// scsi0 := fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
 	// vmOption.Scsi.Scsi0 = scsi0
 	vmOption.Scsi.Scsi0 = fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
 
-	// Loop through ExtraDisks and inject correct storage
-	for i, disk := range s.scope.GetHardware().ExtraDisks {
-		scsiKey := fmt.Sprintf("Scsi%d", i+1)
-		vmOption.Scsi[scsiKey] = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+	// Assign Extra Disks
+	extraDisks := s.scope.GetHardware().ExtraDisks
+	if len(extraDisks) > 0 {
+		if len(extraDisks) > 6 {
+			return nil // Returning nil indicates an error
+		}
+		for i, disk := range extraDisks {
+			switch i {
+			case 0:
+				vmOption.Scsi.Scsi1 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 1:
+				vmOption.Scsi.Scsi2 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 2:
+				vmOption.Scsi.Scsi3 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 3:
+				vmOption.Scsi.Scsi4 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 4:
+				vmOption.Scsi.Scsi5 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 5:
+				vmOption.Scsi.Scsi6 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			}
+		}
 	}
-	vmOption.Ide.Ide2 = ide2
-	vmOption.Storage = storage
 
 	return vmOption
 }
