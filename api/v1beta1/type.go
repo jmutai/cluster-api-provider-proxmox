@@ -56,6 +56,13 @@ type Image struct {
 	ChecksumType *string `json:"checksumType,omitempty"`
 }
 
+// ExtraDisk represents an additional virtual disk
+type ExtraDisk struct {
+	Size    string `json:"size"`    // e.g., "100Gi"
+	Storage string `json:"storage"` // e.g., "local-lvm"
+	Type    string `json:"type"`    // e.g., "scsi", "virtio"
+}
+
 // Hardware
 type Hardware struct {
 	// amount of RAM for the VM in MiB : 16 ~
@@ -94,7 +101,8 @@ type Hardware struct {
 	// hard disk size
 	// +kubebuilder:validation:Pattern:=\+?\d+(\.\d+)?[KMGT]?
 	// +kubebuilder:default:="50G"
-	Disk string `json:"disk,omitempty"`
+	RootDisk   string      `json:"rootDisk,omitempty"`
+	ExtraDisks []ExtraDisk `json:"extraDisks,omitempty"` // Add support for multiple disks
 
 	// network devices
 	// to do: multiple devices
