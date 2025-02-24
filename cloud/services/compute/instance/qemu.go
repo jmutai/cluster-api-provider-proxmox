@@ -202,23 +202,47 @@ func (s *Service) injectVMOption(vmOption *api.VirtualMachineCreateOptions, stor
 	// Assign primary root disk
 	// Assign primary root disk (`Scsi0`) - this is the only disk using `import-from`
 	vmOption.Scsi.Scsi0 = fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
-	// Assign Extra Disks (Scsi1, Scsi2, ...), ensuring proper format
+
+	// Assign Extra Disks (Scsi1, Scsi2, ... up to Scsi5)
 	extraDisks := s.scope.GetHardware().ExtraDisks
 	if len(extraDisks) > 5 {
 		log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 5 extra disks are supported, ignoring excess")
-		extraDisks = extraDisks[:5] // Limit to 5 extra disks (total 6 including root)
+		extraDisks = extraDisks[:5] // Limit to 5 extra disks
 	}
 
-	// Use reflection to dynamically set `Scsi1`, `Scsi2`, etc.
-	scsiStruct := reflect.ValueOf(&vmOption.Scsi).Elem()
-	for i, disk := range extraDisks {
-		fieldName := fmt.Sprintf("Scsi%d", i+1) // Scsi1, Scsi2, ...
-		field := scsiStruct.FieldByName(fieldName)
-		if field.IsValid() && field.CanSet() {
-			field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
-		} else {
-			log.FromContext(context.TODO()).Error(fmt.Errorf("invalid SCSI field"), "Failed to set extra disk", "field", fieldName)
-		}
+	// Set each disk explicitly
+	if len(extraDisks) > 0 {
+		vmOption.Scsi.Scsi1 = fmt.Sprintf("%s:1,size=%s", extraDisks[0].Storage, extraDisks[0].Size)
 	}
+	if len(extraDisks) > 1 {
+		vmOption.Scsi.Scsi2 = fmt.Sprintf("%s:2,size=%s", extraDisks[1].Storage, extraDisks[1].Size)
+	}
+	if len(extraDisks) > 2 {
+		vmOption.Scsi.Scsi3 = fmt.Sprintf("%s:3,size=%s", extraDisks[2].Storage, extraDisks[2].Size)
+	}
+	if len(extraDisks) > 3 {
+		vmOption.Scsi.Scsi4 = fmt.Sprintf("%s:4,size=%s", extraDisks[3].Storage, extraDisks[3].Size)
+	}
+	if len(extraDisks) > 4 {
+		vmOption.Scsi.Scsi5 = fmt.Sprintf("%s:5,size=%s", extraDisks[4].Storage, extraDisks[4].Size)
+	}
+	// Assign Extra Disks (Scsi1, Scsi2, ...), ensuring proper format
+	// extraDisks := s.scope.GetHardware().ExtraDisks
+	// if len(extraDisks) > 5 {
+	// 	log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 5 extra disks are supported, ignoring excess")
+	// 	extraDisks = extraDisks[:5] // Limit to 5 extra disks (total 6 including root)
+	// }
+
+	// // Use reflection to dynamically set `Scsi1`, `Scsi2`, etc.
+	// scsiStruct := reflect.ValueOf(&vmOption.Scsi).Elem()
+	// for i, disk := range extraDisks {
+	// 	fieldName := fmt.Sprintf("Scsi%d", i+1) // Scsi1, Scsi2, ...
+	// 	field := scsiStruct.FieldByName(fieldName)
+	// 	if field.IsValid() && field.CanSet() {
+	// 		field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
+	// 	} else {
+	// 		log.FromContext(context.TODO()).Error(fmt.Errorf("invalid SCSI field"), "Failed to set extra disk", "field", fieldName)
+	// 	}
+	// }
 	return vmOption
 }
