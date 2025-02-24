@@ -117,7 +117,7 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 	// Assign additional disks manually
 	extraDisks := s.scope.GetHardware().ExtraDisks
 	if len(extraDisks) > 0 {
-		if len(extraDisks) > 6 {
+		if len(extraDisks) > 5 {
 			return api.VirtualMachineCreateOptions{}, fmt.Errorf("too many extra disks, only 6 supported")
 		}
 		for i, disk := range extraDisks {
@@ -132,8 +132,6 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 				scsiDisks.Scsi4 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
 			case 4:
 				scsiDisks.Scsi5 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 5:
-				scsiDisks.Scsi6 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
 			}
 		}
 	}
@@ -200,12 +198,13 @@ func (s *Service) injectVMOption(vmOption *api.VirtualMachineCreateOptions, stor
 
 	// scsi0 := fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
 	// vmOption.Scsi.Scsi0 = scsi0
+	// Assign primary root disk
 	vmOption.Scsi.Scsi0 = fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
 
 	// Assign Extra Disks
 	extraDisks := s.scope.GetHardware().ExtraDisks
 	if len(extraDisks) > 0 {
-		if len(extraDisks) > 6 {
+		if len(extraDisks) > 5 {
 			return nil // Returning nil indicates an error
 		}
 		for i, disk := range extraDisks {
@@ -220,8 +219,6 @@ func (s *Service) injectVMOption(vmOption *api.VirtualMachineCreateOptions, stor
 				vmOption.Scsi.Scsi4 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
 			case 4:
 				vmOption.Scsi.Scsi5 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 5:
-				vmOption.Scsi.Scsi6 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
 			}
 		}
 	}
