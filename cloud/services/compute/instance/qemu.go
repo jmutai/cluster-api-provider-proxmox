@@ -124,10 +124,18 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 		extraDisks = extraDisks[:5] // Trim to max 5 extra disks
 	}
 
+	// Assign extra disks using reflection
+	scsiStruct := reflect.ValueOf(&scsiDisks).Elem()
 	for i, disk := range extraDisks {
-		slot := i + 1 // scsi1, scsi2, scsi3...
-		scsiDisks.Set(fmt.Sprintf("Scsi%d", slot), fmt.Sprintf("%s:%d,size=%s", disk.Storage, slot, disk.Size))
+		fieldName := fmt.Sprintf("Scsi%d", i+1) // Scsi1, Scsi2, ...
+		field := scsiStruct.FieldByName(fieldName)
+		if field.IsValid() && field.CanSet() {
+			field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
+		} else {
+			log.FromContext(context.TODO()).Error(fmt.Errorf("invalid SCSI field"), "Failed to set extra disk", "field", fieldName)
+		}
 	}
+
 	vmoptions := api.VirtualMachineCreateOptions{
 		ACPI:          boolToInt8(options.ACPI),
 		Agent:         "enabled=1",
