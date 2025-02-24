@@ -111,31 +111,21 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 	// scsi0 := fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage()))
 	net0 := hardware.NetworkDevice.String()
 	// Assign primary SCSI disk
-	scsiDisks := api.Scsi{
-		Scsi0: fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage())),
-	}
+	// scsiDisks := api.Scsi{
+	// 	Scsi0: fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage())),
+	// }
+	scsiDisks := api.Scsi{}
+	scsiDisks.Scsi0 = fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage()))
 	// Assign additional disks manually
 	extraDisks := s.scope.GetHardware().ExtraDisks
 	if len(extraDisks) > 5 {
 		log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 6 extra disks are supported, ignoring extra disks")
-		extraDisks = extraDisks[:6] // Trim to 5 disks
+		extraDisks = extraDisks[:5] // Trim to max 5 extra disks
 	}
 
 	for i, disk := range extraDisks {
-		switch i {
-		case 0:
-			scsiDisks.Scsi1 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-		case 1:
-			scsiDisks.Scsi2 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-		case 2:
-			scsiDisks.Scsi3 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-		case 3:
-			scsiDisks.Scsi4 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-		case 4:
-			scsiDisks.Scsi5 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-		case 5:
-			scsiDisks.Scsi6 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-		}
+		slot := i + 1 // scsi1, scsi2, scsi3...
+		scsiDisks.Set(fmt.Sprintf("Scsi%d", slot), fmt.Sprintf("%s:%d,size=%s", disk.Storage, slot, disk.Size))
 	}
 	vmoptions := api.VirtualMachineCreateOptions{
 		ACPI:          boolToInt8(options.ACPI),
