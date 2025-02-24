@@ -130,7 +130,8 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 		fieldName := fmt.Sprintf("Scsi%d", i+1) // Scsi1, Scsi2, ...
 		field := scsiStruct.FieldByName(fieldName)
 		if field.IsValid() && field.CanSet() {
-			field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
+			field.SetString(fmt.Sprintf("%s:%d,format=%s,size=%s", disk.Storage, i+1, disk.Format, disk.Size))
+			// field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
 		} else {
 			log.FromContext(context.TODO()).Error(fmt.Errorf("invalid SCSI field"), "Failed to set extra disk", "field", fieldName)
 		}
