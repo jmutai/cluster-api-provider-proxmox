@@ -110,13 +110,32 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 	ide2 := fmt.Sprintf("file=%s:cloudinit,media=cdrom", imageStorageName)
 	// scsi0 := fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage()))
 	net0 := hardware.NetworkDevice.String()
-	// Add extra disks dynamically
+	// Assign primary SCSI disk
 	scsiDisks := api.Scsi{
 		Scsi0: fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage())),
 	}
-	for i, disk := range s.scope.GetHardware().ExtraDisks {
-		scsiKey := fmt.Sprintf("Scsi%d", i+1) // Example: Scsi1, Scsi2, Scsi3...
-		scsiDisks[scsiKey] = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+	// Assign additional disks manually
+	extraDisks := s.scope.GetHardware().ExtraDisks
+	if len(extraDisks) > 0 {
+		if len(extraDisks) > 6 {
+			return fmt.Errorf("too many extra disks, only 6 supported")
+		}
+		for i, disk := range extraDisks {
+			switch i {
+			case 0:
+				scsiDisks.Scsi1 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 1:
+				scsiDisks.Scsi2 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 2:
+				scsiDisks.Scsi3 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 3:
+				scsiDisks.Scsi4 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 4:
+				scsiDisks.Scsi5 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			case 5:
+				scsiDisks.Scsi6 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+			}
+		}
 	}
 
 	vmoptions := api.VirtualMachineCreateOptions{
