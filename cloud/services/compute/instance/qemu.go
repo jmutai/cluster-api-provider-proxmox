@@ -190,29 +190,18 @@ func (s *Service) injectVMOption(vmOption *api.VirtualMachineCreateOptions, stor
 	// scsi0 := fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
 	// vmOption.Scsi.Scsi0 = scsi0
 	// Assign primary root disk
+	// Assign primary root disk (`Scsi0`) - this is the only disk using `import-from`
 	vmOption.Scsi.Scsi0 = fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
-
-	// Assign Extra Disks
+	// Assign Extra Disks (Scsi1, Scsi2, ...), ensuring proper format
 	extraDisks := s.scope.GetHardware().ExtraDisks
-	if len(extraDisks) > 0 {
-		if len(extraDisks) > 5 {
-			return nil // Returning nil indicates an error
-		}
-		for i, disk := range extraDisks {
-			switch i {
-			case 0:
-				vmOption.Scsi.Scsi1 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 1:
-				vmOption.Scsi.Scsi2 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 2:
-				vmOption.Scsi.Scsi3 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 3:
-				vmOption.Scsi.Scsi4 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 4:
-				vmOption.Scsi.Scsi5 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			}
-		}
+	if len(extraDisks) > 5 {
+		log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 5 extra disks are supported, ignoring excess")
+		extraDisks = extraDisks[:5] // Limit to 5 extra disks (total 6 including root)
 	}
 
+	for i, disk := range extraDisks {
+		slot := i + 1 // scsi1, scsi2, scsi3...
+		vmOption.Scsi.Set(fmt.Sprintf("Scsi%d", slot), fmt.Sprintf("%s:%d,size=%s", disk.Storage, slot, disk.Size))
+	}
 	return vmOption
 }
