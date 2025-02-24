@@ -58,9 +58,10 @@ type Image struct {
 
 // ExtraDisk represents an additional virtual disk
 type ExtraDisk struct {
-	Size    string `json:"size"`    // e.g., "100Gi"
-	Storage string `json:"storage"` // e.g., "local-lvm"
-	Type    string `json:"type"`    // e.g., "scsi", "virtio"
+	Size    string `json:"size,omitempty"`    // e.g., "100Gi"
+	Storage string `json:"storage,omitempty"` // e.g., "local-lvm"
+	Type    string `json:"type,omitempty"`    // e.g., "scsi", "virtio"
+	Format  string `json:"format,omitempty"`  //
 }
 
 // Hardware
