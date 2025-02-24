@@ -116,26 +116,27 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 	}
 	// Assign additional disks manually
 	extraDisks := s.scope.GetHardware().ExtraDisks
-	if len(extraDisks) > 0 {
-		if len(extraDisks) > 5 {
-			return api.VirtualMachineCreateOptions{}, fmt.Errorf("too many extra disks, only 6 supported")
-		}
-		for i, disk := range extraDisks {
-			switch i {
-			case 0:
-				scsiDisks.Scsi1 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 1:
-				scsiDisks.Scsi2 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 2:
-				scsiDisks.Scsi3 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 3:
-				scsiDisks.Scsi4 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			case 4:
-				scsiDisks.Scsi5 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
-			}
-		}
+	if len(extraDisks) > 5 {
+		log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 6 extra disks are supported, ignoring extra disks")
+		extraDisks = extraDisks[:6] // Trim to 5 disks
 	}
 
+	for i, disk := range extraDisks {
+		switch i {
+		case 0:
+			scsiDisks.Scsi1 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+		case 1:
+			scsiDisks.Scsi2 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+		case 2:
+			scsiDisks.Scsi3 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+		case 3:
+			scsiDisks.Scsi4 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+		case 4:
+			scsiDisks.Scsi5 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+		case 5:
+			scsiDisks.Scsi6 = fmt.Sprintf("%s:%d,%s", disk.Storage, i+1, disk.Size)
+		}
+	}
 	vmoptions := api.VirtualMachineCreateOptions{
 		ACPI:          boolToInt8(options.ACPI),
 		Agent:         "enabled=1",
