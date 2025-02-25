@@ -98,8 +98,8 @@ func (s *Service) createQEMU(ctx context.Context) (*proxmox.VirtualMachine, erro
 	}
 
 	// Resize disks immediately after creation
-	if err := s.resizeExtraDisks(ctx, node, vmid); err != nil {
-		log.Error(err, "failed to resize extra disks")
+	if err := s.resizeExtraDisks(ctx, vm); err != nil {
+		log.Error(err, "Failed to resize extra disks")
 	}
 
 	return vm, nil
