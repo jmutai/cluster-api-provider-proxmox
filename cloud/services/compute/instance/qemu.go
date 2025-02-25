@@ -105,9 +105,9 @@ func (s *Service) createQEMU(ctx context.Context) (*proxmox.VirtualMachine, erro
 	return vm, nil
 }
 
-func (s *Service) resizeExtraDisks(ctx context.Context, node string, vmid int) error {
+func (s *Service) resizeExtraDisks(ctx context.Context, vm *proxmox.VirtualMachine) error {
 	log := log.FromContext(ctx)
-	log.Info("Resizing additional disks for VM", "vmid", vmid)
+	log.Info("Resizing additional disks for VM", "vmid", vm.VM.VMID)
 
 	extraDisks := s.scope.GetHardware().ExtraDisks
 	if len(extraDisks) == 0 {
@@ -116,17 +116,17 @@ func (s *Service) resizeExtraDisks(ctx context.Context, node string, vmid int) e
 
 	for i, disk := range extraDisks {
 		diskName := fmt.Sprintf("scsi%d", i+1) // scsi1, scsi2, scsi3...
-		log.Info("Resizing disk", "vmid", vmid, "disk", diskName, "size", disk.Size)
+		log.Info("Resizing disk", "vmid", vm.VM.VMID, "disk", diskName, "size", disk.Size)
 
-		// Execute Proxmox resize command
-		err := s.client.ResizeDisk(ctx, node, vmid, diskName, disk.Size)
+		// Use `ResizeVolume` to resize the disk
+		err := vm.ResizeVolume(ctx, diskName, disk.Size)
 		if err != nil {
 			log.Error(err, "Failed to resize disk", "disk", diskName)
 			return err
 		}
 	}
 
-	log.Info("Successfully resized all extra disks", "vmid", vmid)
+	log.Info("Successfully resized all extra disks", "vmid", vm.VM.VMID)
 	return nil
 }
 
