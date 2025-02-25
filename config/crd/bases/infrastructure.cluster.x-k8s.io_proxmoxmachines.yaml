@@ -270,6 +270,7 @@ spec:
                         size:
                           type: string
                           description: Size of the disk (e.g., 100G, 50G)
+                          pattern: \+?\d+(\.\d+)?[KMGT]?
                         storage:
                           type: string
                           description: Storage backend to use (e.g., local-lvm, ceph, etc.)

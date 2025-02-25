@@ -244,7 +244,7 @@ spec:
                       hardware:
                         default:
                           cpu: 2
-                          disk: 50G
+                          rootDisk: 50G
                           memory: 4096
                           networkDevice:
                             bridge: vmbr0
@@ -274,11 +274,36 @@ spec:
                           cpuType:
                             description: Emulated CPU Type. Defaults to kvm64
                             type: string
-                          disk:
+                          rootDisk:
                             default: 50G
                             description: hard disk size
                             pattern: \+?\d+(\.\d+)?[KMGT]?
                             type: string
+                          extraDisks:
+                            description: List of additional disks attached to the VM
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                size:
+                                  type: string
+                                  description: Size of the disk (e.g., 100G, 50G)
+                                  pattern: \+?\d+(\.\d+)?[KMGT]?
+                                storage:
+                                  type: string
+                                  description: Storage backend to use (e.g., local-lvm, ceph, etc.)
+                                format:
+                                  type: string
+                                  description: Disk format (qcow2, raw, etc.)
+                                  enum:
+                                    - raw
+                                    - qcow2
+                                slot:
+                                  type: integer
+                                  description: SCSI slot number for the disk
+                              required:
+                                - size
+                                - storage
                           memory:
                             default: 4096
                             description: 'amount of RAM for the VM in MiB : 16 ~'
