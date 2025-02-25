@@ -3,7 +3,8 @@ package instance
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/k8s-proxmox/cluster-api-provider-proxmox/cloud/scheduler/framework"
 	"github.com/k8s-proxmox/proxmox-go/api"
@@ -13,8 +14,26 @@ import (
 )
 
 const (
-	bootDvice = "scsi0"
+	bootDvice     = "scsi0"
+	maxExtraDisks = 5 // Maximum allowed extra disks
 )
+
+// Convert human-readable size (e.g., "40G") into bytes
+func convertSizeToMB(size string) int {
+	if strings.HasSuffix(size, "G") {
+		val, err := strconv.Atoi(strings.TrimSuffix(size, "G"))
+		if err == nil {
+			return val * 1024 // Convert to MB
+		}
+	}
+	if strings.HasSuffix(size, "M") {
+		val, err := strconv.Atoi(strings.TrimSuffix(size, "M"))
+		if err == nil {
+			return val
+		}
+	}
+	return 1024 // Default 1GB if conversion fails
+}
 
 // reconciles QEMU instance
 func (s *Service) reconcileQEMU(ctx context.Context) (*proxmox.VirtualMachine, error) {
@@ -119,21 +138,36 @@ func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
 	scsiDisks.Scsi0 = fmt.Sprintf("%s:0,import-from=%s", imageStorageName, rawImageFilePath(s.scope.GetImage()))
 	// Assign additional disks manually
 	extraDisks := s.scope.GetHardware().ExtraDisks
-	if len(extraDisks) > 5 {
-		log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 6 extra disks are supported, ignoring extra disks")
-		extraDisks = extraDisks[:5] // Trim to max 5 extra disks
+	if len(extraDisks) > maxExtraDisks {
+		log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 5 extra disks are supported, ignoring extra disks")
+		extraDisks = extraDisks[:maxExtraDisks] // Trim to max 5 extra disks
 	}
 
 	// Assign extra disks using reflection
-	scsiStruct := reflect.ValueOf(&scsiDisks).Elem()
+	// scsiStruct := reflect.ValueOf(&scsiDisks).Elem()
+	// for i, disk := range extraDisks {
+	// 	fieldName := fmt.Sprintf("Scsi%d", i+1) // Scsi1, Scsi2, ...
+	// 	field := scsiStruct.FieldByName(fieldName)
+	// 	if field.IsValid() && field.CanSet() {
+	// 		field.SetString(fmt.Sprintf("%s:%d,format=%s,size=%s", disk.Storage, i+1, disk.Format, disk.Size))
+	// 		// field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
+	// 	} else {
+	// 		log.FromContext(context.TODO()).Error(fmt.Errorf("invalid SCSI field"), "Failed to set extra disk", "field", fieldName)
+	// 	}
+	// }
 	for i, disk := range extraDisks {
-		fieldName := fmt.Sprintf("Scsi%d", i+1) // Scsi1, Scsi2, ...
-		field := scsiStruct.FieldByName(fieldName)
-		if field.IsValid() && field.CanSet() {
-			field.SetString(fmt.Sprintf("%s:%d,format=%s,size=%s", disk.Storage, i+1, disk.Format, disk.Size))
-			// field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
-		} else {
-			log.FromContext(context.TODO()).Error(fmt.Errorf("invalid SCSI field"), "Failed to set extra disk", "field", fieldName)
+		diskSizeMB := convertSizeToMB(disk.Size)
+		switch i {
+		case 0:
+			scsiDisks.Scsi1 = fmt.Sprintf("%s:1,size=%dM", disk.Storage, diskSizeMB)
+		case 1:
+			scsiDisks.Scsi1 = fmt.Sprintf("%s:2,size=%dM", disk.Storage, diskSizeMB)
+		case 2:
+			scsiDisks.Scsi1 = fmt.Sprintf("%s:3,size=%dM", disk.Storage, diskSizeMB)
+		case 3:
+			scsiDisks.Scsi1 = fmt.Sprintf("%s:4,size=%dM", disk.Storage, diskSizeMB)
+		case 4:
+			scsiDisks.Scsi1 = fmt.Sprintf("%s:5,size=%dM", disk.Storage, diskSizeMB)
 		}
 	}
 
@@ -204,45 +238,24 @@ func (s *Service) injectVMOption(vmOption *api.VirtualMachineCreateOptions, stor
 	vmOption.Scsi.Scsi0 = fmt.Sprintf("%s:0,import-from=%s", storage, rawImageFilePath(s.scope.GetImage()))
 
 	// Assign Extra Disks (Scsi1, Scsi2, ... up to Scsi5)
-	extraDisks := s.scope.GetHardware().ExtraDisks
-	if len(extraDisks) > 5 {
-		log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 5 extra disks are supported, ignoring excess")
-		extraDisks = extraDisks[:5] // Limit to 5 extra disks
+	for i, disk := range s.scope.GetHardware().ExtraDisks {
+		if i >= maxExtraDisks {
+			break
+		}
+		diskSizeMB := convertSizeToMB(disk.Size)
+		switch i {
+		case 0:
+			vmOption.Scsi.Scsi1 = fmt.Sprintf("%s:1,size=%dM", disk.Storage, diskSizeMB)
+		case 1:
+			vmOption.Scsi.Scsi2 = fmt.Sprintf("%s:2,size=%dM", disk.Storage, diskSizeMB)
+		case 2:
+			vmOption.Scsi.Scsi3 = fmt.Sprintf("%s:3,size=%dM", disk.Storage, diskSizeMB)
+		case 3:
+			vmOption.Scsi.Scsi4 = fmt.Sprintf("%s:4,size=%dM", disk.Storage, diskSizeMB)
+		case 4:
+			vmOption.Scsi.Scsi5 = fmt.Sprintf("%s:5,size=%dM", disk.Storage, diskSizeMB)
+		}
 	}
 
-	// Set each disk explicitly
-	if len(extraDisks) > 0 {
-		vmOption.Scsi.Scsi1 = fmt.Sprintf("%s:1,size=%s", extraDisks[0].Storage, extraDisks[0].Size)
-	}
-	if len(extraDisks) > 1 {
-		vmOption.Scsi.Scsi2 = fmt.Sprintf("%s:2,size=%s", extraDisks[1].Storage, extraDisks[1].Size)
-	}
-	if len(extraDisks) > 2 {
-		vmOption.Scsi.Scsi3 = fmt.Sprintf("%s:3,size=%s", extraDisks[2].Storage, extraDisks[2].Size)
-	}
-	if len(extraDisks) > 3 {
-		vmOption.Scsi.Scsi4 = fmt.Sprintf("%s:4,size=%s", extraDisks[3].Storage, extraDisks[3].Size)
-	}
-	if len(extraDisks) > 4 {
-		vmOption.Scsi.Scsi5 = fmt.Sprintf("%s:5,size=%s", extraDisks[4].Storage, extraDisks[4].Size)
-	}
-	// Assign Extra Disks (Scsi1, Scsi2, ...), ensuring proper format
-	// extraDisks := s.scope.GetHardware().ExtraDisks
-	// if len(extraDisks) > 5 {
-	// 	log.FromContext(context.TODO()).Error(fmt.Errorf("too many extra disks"), "Only 5 extra disks are supported, ignoring excess")
-	// 	extraDisks = extraDisks[:5] // Limit to 5 extra disks (total 6 including root)
-	// }
-
-	// // Use reflection to dynamically set `Scsi1`, `Scsi2`, etc.
-	// scsiStruct := reflect.ValueOf(&vmOption.Scsi).Elem()
-	// for i, disk := range extraDisks {
-	// 	fieldName := fmt.Sprintf("Scsi%d", i+1) // Scsi1, Scsi2, ...
-	// 	field := scsiStruct.FieldByName(fieldName)
-	// 	if field.IsValid() && field.CanSet() {
-	// 		field.SetString(fmt.Sprintf("%s:%d,size=%s", disk.Storage, i+1, disk.Size))
-	// 	} else {
-	// 		log.FromContext(context.TODO()).Error(fmt.Errorf("invalid SCSI field"), "Failed to set extra disk", "field", fieldName)
-	// 	}
-	// }
 	return vmOption
 }
