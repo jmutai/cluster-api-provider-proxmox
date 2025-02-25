@@ -97,7 +97,37 @@ func (s *Service) createQEMU(ctx context.Context) (*proxmox.VirtualMachine, erro
 		return nil, err
 	}
 
+	// Resize disks immediately after creation
+	if err := s.resizeExtraDisks(ctx, node, vmid); err != nil {
+		log.Error(err, "failed to resize extra disks")
+	}
+
 	return vm, nil
+}
+
+func (s *Service) resizeExtraDisks(ctx context.Context, node string, vmid int) error {
+	log := log.FromContext(ctx)
+	log.Info("Resizing additional disks for VM", "vmid", vmid)
+
+	extraDisks := s.scope.GetHardware().ExtraDisks
+	if len(extraDisks) == 0 {
+		return nil // No extra disks, nothing to do
+	}
+
+	for i, disk := range extraDisks {
+		diskName := fmt.Sprintf("scsi%d", i+1) // scsi1, scsi2, scsi3...
+		log.Info("Resizing disk", "vmid", vmid, "disk", diskName, "size", disk.Size)
+
+		// Execute Proxmox resize command
+		err := s.client.ResizeDisk(ctx, node, vmid, diskName, disk.Size)
+		if err != nil {
+			log.Error(err, "Failed to resize disk", "disk", diskName)
+			return err
+		}
+	}
+
+	log.Info("Successfully resized all extra disks", "vmid", vmid)
+	return nil
 }
 
 func (s *Service) generateVMOptions() api.VirtualMachineCreateOptions {
